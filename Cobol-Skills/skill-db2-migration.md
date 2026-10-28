@@ -1,0 +1,196 @@
+# Skill: DB2 Migration — COBOL II to Enterprise COBOL 6.5
+
+> Source: `skill-migration-v65.md` §Ch.25 "Db2 coprocessor conversion considerations"
+
+---
+
+## 1. Integrated DB2 Coprocessor — Main Change
+
+In COBOL II, DB2 access required a separate **precompile** step running the
+`DSNHPC` program before the COBOL compilation.
+
+In Enterprise COBOL 6.5, the DB2 coprocessor is **integrated** into the
+compiler — activated by the `SQL` option.
+
+### COBOL II JCL (4 relevant steps)
+
+```jcl
+*-- STEP 1: DB2 PRECOMPILE --
+//DB2PREC EXEC PGM=DSNHPC,
+//            PARM='HOST(COBOL),VERSION(AUTO),APOSTSQL(YES)'
+//DBRMLIB DD DSN=BANCO.DBRMLIB(MYPGM),DISP=SHR
+//SYSCIN  DD DSN=&&DB2OUT,DISP=(NEW,PASS),...
+//SYSLIB  DD DSN=BANCO.CICS.COPYLIB,DISP=SHR
+//        DD DSN=BANCO.DB2.DCLGEN,DISP=SHR
+//SYSIN   DD DSN=BANCO.CICS.SRC(MYPGM),DISP=SHR
+//SYSPRINT DD SYSOUT=*
+
+*-- STEP 2: (CICS TRANSLATOR if applicable) ...
+
+*-- STEP 3: COMPILE --
+//COBCOMP EXEC PGM=IGYCRCTL,PARM='RENT,RES,...'
+//SYSIN   DD DSN=&&DB2OUT,DISP=(OLD,DELETE)  *> precompiler output
+```
+
+### Enterprise COBOL 6.5 JCL (single step)
+
+```jcl
+*-- SINGLE STEP: COMPILE WITH INTEGRATED COPROCESSOR --
+//COBCOMP EXEC PGM=IGYCRCTL,
+//            PARM='RENT,LIB,OPT(FULL),SQL,CICS(''COBOL2''),NODYNAM'
+*                                      ^^^
+*                   The SQL option activates the integrated DB2 coprocessor
+//SYSLIB  DD DSN=BANCO.CICS.COPYLIB,DISP=SHR
+//        DD DSN=BANCO.DB2.DCLGEN,DISP=SHR   *> DCLGENs in SYSLIB
+//        DD DSN=CICS.SDFHCOB,DISP=SHR
+//SYSIN   DD DSN=BANCO.CICS.SRC(MYPGM),DISP=SHR  *> original source
+//SYSLIN  DD DSN=&&COBOUT,...
+//SYSPRINT DD SYSOUT=*
+*> The DBRM is generated automatically through the DBRM DD:
+//DBRM    DD DSN=BANCO.DBRMLIB(MYPGM),DISP=SHR
+```
+
+> **Ref:** `skill-migration-v65.md` §Ch.25 "Db2 coprocessor integration" and
+> "Differences between the Db2 precompiler and the integrated Db2 coprocessor"
+
+---
+
+## 2. DECLARE CURSOR — Mandatory Location
+
+This is the **most critical change** for DB2 programs.
+
+With the `DSNHPC` precompiler, `DECLARE CURSOR` could be placed either in
+Working-Storage or in the Procedure Division.
+
+With the **integrated DB2 coprocessor**, `DECLARE CURSOR` **must be in the
+DATA DIVISION** (Working-Storage or Linkage Section).
+
+```cobol
+* COBOL II with DSNHPC — accepted (cursor in the Procedure Division)
+PROCEDURE DIVISION.
+000-MAINLINE.
+    ...
+    EXEC SQL
+        DECLARE MYCSRSOR CURSOR FOR
+        SELECT COL1, COL2
+        FROM   MY.TABLE
+        WHERE  COL3 = :WS-KEY
+    END-EXEC
+
+* Enterprise COBOL 6.5 with coprocessor — MANDATORY in the DATA DIVISION
+WORKING-STORAGE SECTION.
+    ...
+    EXEC SQL
+        DECLARE MYCSRSOR CURSOR FOR
+        SELECT COL1, COL2
+        FROM   MY.TABLE
+        WHERE  COL3 = :WS-KEY
+    END-EXEC.
+
+PROCEDURE DIVISION.
+000-MAINLINE.
+    ...
+    EXEC SQL OPEN  MYCSRSOR  END-EXEC
+    EXEC SQL FETCH MYCSRSOR INTO :WS-COL1, :WS-COL2 END-EXEC
+    EXEC SQL CLOSE MYCSRSOR  END-EXEC
+```
+
+---
+
+## 3. Precompiler vs Integrated Coprocessor Differences
+
+| Aspect | DSNHPC (Precompiler) | Integrated Coprocessor |
+|---|---|---|
+| `DECLARE CURSOR` in Proc. Div. | Allowed | **Prohibited** — must be in the DATA DIV. |
+| `EXEC SQL INCLUDE` | Processed in the DSNHPC step | Processed directly by the compiler |
+| Host variables in COPY macros | Processed by the precompiler | Processed by the coprocessor |
+| DBRM generated | Via the DBRMLIB DD in the DSNHPC step | Via the DBRM DD in the compile step |
+| Code page conversion | Controlled by DSNHPC | `CODEPAGE` option in the coprocessor |
+| `APOSTSQL` | DSNHPC parameter | `SQL(APOST)` option in the compiler |
+
+---
+
+## 4. EXEC SQL INCLUDE — No Syntax Change
+
+The `EXEC SQL INCLUDE` syntax for DCLGENs remains identical.
+What changes is where the compiler looks for it:
+
+```cobol
+* Both COBOL II and Enterprise COBOL 6.5 — same syntax
+EXEC SQL
+    INCLUDE BKCTCD    *> DCLGEN for table BANCO.CONTA
+END-EXEC.
+
+EXEC SQL
+    INCLUDE SQLCA
+END-EXEC.
+```
+
+**Rule:** In the JCL, make sure the DCLGEN dataset is in the compiler's
+`SYSLIB` concatenation (no longer in the `SYSLIB` of the `DSNHPC` step).
+
+---
+
+## 5. SQLCA and SQLCODE — Standard Handling
+
+The `SQLCA` (SQL Communications Area) and the behavior of the return codes
+remain the same:
+
+```cobol
+EVALUATE SQLCODE
+    WHEN 0
+        *> Success
+        SET WS-FOUND TO TRUE
+    WHEN 100
+        *> NOT FOUND
+        SET WS-NOT-FOUND TO TRUE
+        MOVE 'RECORD NOT FOUND' TO WS-MSG-ERROR
+    WHEN OTHER
+        *> SQL error
+        PERFORM 880-DB2-ERROR THRU 880-EXIT
+END-EVALUATE
+```
+
+**New diagnostic options in EC 6.5:**
+
+| Option | Description |
+|---|---|
+| `NUMCHECK(PAC)` | Checks COMP-3 fields with an even number of digits |
+| `RULES(NOEVENPACK)` | Does not issue a message for DFH/DSN/EYU/SQL fields |
+
+---
+
+## 6. BIND and DBRM — No Change
+
+The DBRM BIND process on the DB2 subsystem **does not change**. The DBRM
+generated by the integrated coprocessor is compatible with DB2 BIND in the
+same way as the one generated by DSNHPC.
+
+```jcl
+//DSNUPROC EXEC PGM=IKJEFT01
+//SYSTSPRT DD SYSOUT=*
+//SYSTSIN  DD *
+  DSN SYSTEM(DB2P)
+  BIND PACKAGE(BANCPKG) -
+       MEMBER(MYPGM)    -
+       LIBRARY('BANCO.DBRMLIB') -
+       ISOLATION(CS) -
+       VALIDATE(BIND)
+  END
+/*
+```
+
+---
+
+## 7. DB2 Migration Checklist
+
+```
+[ ] DB2PREC step (DSNHPC) removed from the JCL
+[ ] SQL option added to the compiler
+[ ] DBRM DD added to the compile step
+[ ] SYSLIB includes the DCLGEN datasets
+[ ] All DECLARE CURSOR statements moved to WORKING-STORAGE SECTION
+[ ] EXEC SQL INCLUDE stays in the DATA DIVISION (no change)
+[ ] BIND re-run with the new DBRMs generated by the coprocessor
+[ ] Regression tests of all SQL accesses
+```

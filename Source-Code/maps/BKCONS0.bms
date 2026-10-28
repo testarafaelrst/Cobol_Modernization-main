@@ -1,0 +1,179 @@
+***********************************************************************
+* MAPSET : BKCONS0                                                    *
+* PROGRAM: BKC01                                                      *
+* TITLE  : CONSULTA AGENCIA/CONTA BANCARIA - MAPA BMS                *
+* AUTHOR : COBOL II CICS BANKING DEMO                                 *
+* DATE   : 2024                                                        *
+*                                                                      *
+* MAP01 (BKCON01) - TELA DE CONSULTA: ENTRADA AGENCIA/CONTA          *
+*                   + EXIBICAO DE DADOS DA CONTA E SALDO              *
+* INSTRUCOES:                                                          *
+*   ENTER = CONSULTAR                                                  *
+*   PF3   = SAIR                                                       *
+*   PF7   = LIMPAR CAMPOS                                              *
+***********************************************************************
+BKCONS0  DFHMSD TYPE=&SYSPARM,                                         X
+               LANG=COBOL,                                             X
+               MODE=INOUT,                                             X
+               TERM=3270-2,                                            X
+               STORAGE=AUTO,                                           X
+               TIOAPFX=YES
+***********************************************************************
+* MAPA 01 - CONSULTA PRINCIPAL                                        *
+***********************************************************************
+BKCON01  DFHMDI SIZE=(24,80),                                          X
+               LINE=1,                                                 X
+               COLUMN=1
+*--- LINHA 1: FUNCAO + TITULO ------------------------------------------
+         DFHMDF POS=(1,1),                                             X
+               LENGTH=2,                                               X
+               ATTRB=(UNPROT,FSET),                                    X
+               NAME=M01FUNC,                                           X
+               INITIAL=' '
+         DFHMDF POS=(1,4),                                             X
+               LENGTH=40,                                              X
+               ATTRB=(ASKIP,BRT),                                      X
+               INITIAL='** CONSULTA DE CONTA BANCARIA **'
+         DFHMDF POS=(1,55),                                            X
+               LENGTH=6,                                               X
+               ATTRB=ASKIP,                                            X
+               INITIAL='DATA.:'
+M01DATE  DFHMDF POS=(1,62),                                            X
+               LENGTH=10,                                              X
+               ATTRB=(ASKIP,FSET),                                     X
+               NAME=M01DATE
+*--- LINHA 3: CHAVE - AGENCIA ------------------------------------------
+         DFHMDF POS=(3,1),                                             X
+               LENGTH=11,                                              X
+               ATTRB=ASKIP,                                            X
+               INITIAL='AGENCIA..:'
+M01AGEN  DFHMDF POS=(3,13),                                            X
+               LENGTH=4,                                               X
+               ATTRB=(UNPROT,FSET),                                    X
+               NAME=M01AGEN
+*--- LINHA 4: CHAVE - CONTA --------------------------------------------
+         DFHMDF POS=(4,1),                                             X
+               LENGTH=11,                                              X
+               ATTRB=ASKIP,                                            X
+               INITIAL='CONTA....:'
+M01CONT  DFHMDF POS=(4,13),                                            X
+               LENGTH=10,                                              X
+               ATTRB=(UNPROT,FSET),                                    X
+               NAME=M01CONT
+*--- LINHA 6: DADOS DA CONTA (OUTPUT) ----------------------------------
+         DFHMDF POS=(6,1),                                             X
+               LENGTH=15,                                              X
+               ATTRB=ASKIP,                                            X
+               INITIAL='NOME CLIENTE.:'
+M01NOME  DFHMDF POS=(6,17),                                            X
+               LENGTH=40,                                              X
+               ATTRB=(ASKIP,FSET),                                     X
+               NAME=M01NOME
+*--- LINHA 7: TIPO CONTA -----------------------------------------------
+         DFHMDF POS=(7,1),                                             X
+               LENGTH=15,                                              X
+               ATTRB=ASKIP,                                            X
+               INITIAL='TIPO CONTA...:'
+M01TIPO  DFHMDF POS=(7,17),                                            X
+               LENGTH=20,                                              X
+               ATTRB=(ASKIP,FSET),                                     X
+               NAME=M01TIPO
+*--- LINHA 8: SALDO ATUAL ----------------------------------------------
+         DFHMDF POS=(8,1),                                             X
+               LENGTH=15,                                              X
+               ATTRB=ASKIP,                                            X
+               INITIAL='SALDO ATUAL..:'
+M01SALD  DFHMDF POS=(8,17),                                            X
+               LENGTH=18,                                              X
+               ATTRB=(ASKIP,FSET),                                     X
+               NAME=M01SALD,                                           X
+               PICOUT='ZZZ.ZZZ.ZZ9,99-'
+*--- LINHA 10: SEPARADOR EXTRATO ---------------------------------------
+         DFHMDF POS=(10,1),                                            X
+               LENGTH=78,                                              X
+               ATTRB=(ASKIP,BRT),                                      X
+               INITIAL='-- EXTRATO ULTIMOS 5 DIAS -----------X
+               ---------------------------------'
+*--- LINHA 11: CABECALHO COLUNAS DO EXTRATO ----------------------------
+         DFHMDF POS=(11,1),                                            X
+               LENGTH=78,                                              X
+               ATTRB=(ASKIP,BRT),                                      X
+               INITIAL='DATA       HISTORICO             TIPO  X
+               VALOR            SALDO'
+*--- LINHAS 12-16: EXTRATO - 5 MOVIMENTOS (DT/HIST/TIPO/VALOR/SALDO) --
+M01DT1   DFHMDF POS=(12,1),  LENGTH=10, ATTRB=(ASKIP,FSET),           X
+               NAME=M01DT1
+M01HI1   DFHMDF POS=(12,12), LENGTH=20, ATTRB=(ASKIP,FSET),           X
+               NAME=M01HI1
+M01TP1   DFHMDF POS=(12,33), LENGTH=6,  ATTRB=(ASKIP,FSET),           X
+               NAME=M01TP1
+M01VL1   DFHMDF POS=(12,40), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01VL1,  PICOUT='ZZZ.ZZ9,99-'
+M01SL1   DFHMDF POS=(12,55), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01SL1,  PICOUT='ZZZ.ZZ9,99-'
+
+M01DT2   DFHMDF POS=(13,1),  LENGTH=10, ATTRB=(ASKIP,FSET),           X
+               NAME=M01DT2
+M01HI2   DFHMDF POS=(13,12), LENGTH=20, ATTRB=(ASKIP,FSET),           X
+               NAME=M01HI2
+M01TP2   DFHMDF POS=(13,33), LENGTH=6,  ATTRB=(ASKIP,FSET),           X
+               NAME=M01TP2
+M01VL2   DFHMDF POS=(13,40), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01VL2,  PICOUT='ZZZ.ZZ9,99-'
+M01SL2   DFHMDF POS=(13,55), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01SL2,  PICOUT='ZZZ.ZZ9,99-'
+
+M01DT3   DFHMDF POS=(14,1),  LENGTH=10, ATTRB=(ASKIP,FSET),           X
+               NAME=M01DT3
+M01HI3   DFHMDF POS=(14,12), LENGTH=20, ATTRB=(ASKIP,FSET),           X
+               NAME=M01HI3
+M01TP3   DFHMDF POS=(14,33), LENGTH=6,  ATTRB=(ASKIP,FSET),           X
+               NAME=M01TP3
+M01VL3   DFHMDF POS=(14,40), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01VL3,  PICOUT='ZZZ.ZZ9,99-'
+M01SL3   DFHMDF POS=(14,55), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01SL3,  PICOUT='ZZZ.ZZ9,99-'
+
+M01DT4   DFHMDF POS=(15,1),  LENGTH=10, ATTRB=(ASKIP,FSET),           X
+               NAME=M01DT4
+M01HI4   DFHMDF POS=(15,12), LENGTH=20, ATTRB=(ASKIP,FSET),           X
+               NAME=M01HI4
+M01TP4   DFHMDF POS=(15,33), LENGTH=6,  ATTRB=(ASKIP,FSET),           X
+               NAME=M01TP4
+M01VL4   DFHMDF POS=(15,40), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01VL4,  PICOUT='ZZZ.ZZ9,99-'
+M01SL4   DFHMDF POS=(15,55), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01SL4,  PICOUT='ZZZ.ZZ9,99-'
+
+M01DT5   DFHMDF POS=(16,1),  LENGTH=10, ATTRB=(ASKIP,FSET),           X
+               NAME=M01DT5
+M01HI5   DFHMDF POS=(16,12), LENGTH=20, ATTRB=(ASKIP,FSET),           X
+               NAME=M01HI5
+M01TP5   DFHMDF POS=(16,33), LENGTH=6,  ATTRB=(ASKIP,FSET),           X
+               NAME=M01TP5
+M01VL5   DFHMDF POS=(16,40), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01VL5,  PICOUT='ZZZ.ZZ9,99-'
+M01SL5   DFHMDF POS=(16,55), LENGTH=14, ATTRB=(ASKIP,FSET),           X
+               NAME=M01SL5,  PICOUT='ZZZ.ZZ9,99-'
+
+*--- LINHA 22: INSTRUCOES DE PF KEYS (SAA STANDARD) --------------------
+         DFHMDF POS=(22,1),                                            X
+               LENGTH=70,                                              X
+               ATTRB=(ASKIP,BRT),                                      X
+               INITIAL='PF3=SAIR  PF7=LIMPAR  ENTER=CONSULTAR'
+*--- LINHA 23: AREA DE MENSAGENS (5 + 36 + 36 = 77 cols) ---------------
+M01PROG  DFHMDF POS=(23,1),                                            X
+               LENGTH=5,                                               X
+               ATTRB=(ASKIP,BRT),                                      X
+               NAME=M01PROG,                                           X
+               INITIAL='BKC01'
+M01MSGL  DFHMDF POS=(23,7),                                            X
+               LENGTH=36,                                              X
+               ATTRB=(ASKIP,BRT),                                      X
+               NAME=M01MSGL
+M01MSGR  DFHMDF POS=(23,44),                                           X
+               LENGTH=36,                                              X
+               ATTRB=ASKIP,                                            X
+               NAME=M01MSGR
+         DFHMSD TYPE=FINAL
+         END
